@@ -7,6 +7,7 @@ package zlc.season.rxdownloadproject;
 public class Constants {
 	//
 	public final static String URL = "http://dldir1.qq.com/weixin/android/weixin6330android920.apk";
+	public final static String URL_QINIU = "http://os4xbbsrf.bkt.clouddn.com/%E6%89%8B%E6%9C%BAQQ_5.0.0.apk";
 	public final static String URL1 = "https://qd.myapp.com/myapp/qqteam/AndroidQQ/mobileqq_android.apk";
 	public final static String URL2 = "http://s1.music.126.net/download/android/CloudMusic_official_3.7.3_153912.apk";
 	public final static String URL3 = "http://dl.coolapkmarket.com/down/apk_file/2017/0301/com.ss.android.article.news-6.0.2-602-0301.apk";

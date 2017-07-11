@@ -99,6 +99,7 @@ public class DownloadHelper {
      * @return DownloadStatus
      */
     public Observable<DownloadStatus> downloadDispatcher(final DownloadBean bean) {
+        final boolean[] alreadyExist = {false};
         return Observable.just(1)
                 .doOnSubscribe(new Consumer<Disposable>() {
                     @Override
@@ -122,12 +123,18 @@ public class DownloadHelper {
                     @Override
                     public void accept(Throwable throwable) throws Exception {
                         logError(throwable);
+                        if (throwable instanceof IllegalArgumentException
+                                && throwable.getMessage().contains("already exists")) {
+                            alreadyExist[0] = true;
+                        }
                     }
                 })
                 .doFinally(new Action() {
                     @Override
                     public void run() throws Exception {
-                        recordTable.delete(bean.getUrl());
+                        if(!alreadyExist[0]){
+                            recordTable.delete(bean.getUrl());
+                        }
                     }
                 });
     }

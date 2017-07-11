@@ -44,6 +44,7 @@ import static zlc.season.rxdownload2.function.Utils.retry;
  * Download helper
  */
 public class DownloadHelper {
+    private static final Object lock = new Object();
     private int maxRetryCount = 3;
     private int maxThreads = 3;
 
@@ -122,12 +123,20 @@ public class DownloadHelper {
                     @Override
                     public void accept(Throwable throwable) throws Exception {
                         logError(throwable);
+                        if (!(throwable instanceof IllegalArgumentException)
+                                || !throwable.getMessage().contains("already exists")) {
+                            synchronized (lock){
+                                recordTable.delete(bean.getUrl());
+                            }
+                        }
                     }
                 })
-                .doFinally(new Action() {
+                .doOnComplete(new Action() {
                     @Override
                     public void run() throws Exception {
-                        recordTable.delete(bean.getUrl());
+                        synchronized (lock){
+                            recordTable.delete(bean.getUrl());
+                        }
                     }
                 });
     }
@@ -156,10 +165,12 @@ public class DownloadHelper {
      * @param bean download bean
      */
     private void addTempRecord(DownloadBean bean) {
-        if (recordTable.contain(bean.getUrl())) {
-            throw new IllegalArgumentException(formatStr(DOWNLOAD_URL_EXISTS, bean.getUrl()));
+        synchronized (lock){
+            if (recordTable.contain(bean.getUrl())) {
+                throw new IllegalArgumentException(formatStr(DOWNLOAD_URL_EXISTS, bean.getUrl()));
+            }
+            recordTable.add(bean.getUrl(), new TemporaryRecord(bean));
         }
-        recordTable.add(bean.getUrl(), new TemporaryRecord(bean));
     }
 
     /**
@@ -186,14 +197,18 @@ public class DownloadHelper {
                 .doOnNext(new Consumer<Object>() {
                     @Override
                     public void accept(Object o) throws Exception {
-                        recordTable.init(url, maxThreads, maxRetryCount, defaultSavePath,
-                                downloadApi, dataBaseHelper);
+                        synchronized (lock){
+                            recordTable.init(url, maxThreads, maxRetryCount, defaultSavePath,
+                                    downloadApi, dataBaseHelper);
+                        }
                     }
                 })
                 .flatMap(new Function<Object, ObservableSource<DownloadType>>() {
                     @Override
                     public ObservableSource<DownloadType> apply(Object o) throws Exception {
-                        return recordTable.fileExists(url) ? existsType(url) : nonExistsType(url);
+                        synchronized (lock){
+                            return recordTable.fileExists(url) ? existsType(url) : nonExistsType(url);
+                        }
                     }
                 });
     }
@@ -210,7 +225,9 @@ public class DownloadHelper {
                     @Override
                     public ObservableSource<DownloadType> apply(Integer integer)
                             throws Exception {
-                        return Observable.just(recordTable.generateNonExistsType(url));
+                        synchronized (lock){
+                            return Observable.just(recordTable.generateNonExistsType(url));
+                        }
                     }
                 });
     }
@@ -226,7 +243,9 @@ public class DownloadHelper {
                 .map(new Function<Integer, String>() {
                     @Override
                     public String apply(Integer integer) throws Exception {
-                        return recordTable.readLastModify(url);
+                        synchronized (lock){
+                            return recordTable.readLastModify(url);
+                        }
                     }
                 })
                 .flatMap(new Function<String, ObservableSource<Object>>() {
@@ -239,7 +258,9 @@ public class DownloadHelper {
                     @Override
                     public ObservableSource<DownloadType> apply(Object o)
                             throws Exception {
-                        return Observable.just(recordTable.generateFileExistsType(url));
+                        synchronized (lock) {
+                            return Observable.just(recordTable.generateFileExistsType(url));
+                        }
                     }
                 });
     }
@@ -270,9 +291,11 @@ public class DownloadHelper {
         return Observable.create(new ObservableOnSubscribe<Object>() {
             @Override
             public void subscribe(ObservableEmitter<Object> emitter) throws Exception {
-                recordTable.saveFileInfo(url, resp);
-                emitter.onNext(new Object());
-                emitter.onComplete();
+                synchronized (lock) {
+                    recordTable.saveFileInfo(url, resp);
+                    emitter.onNext(new Object());
+                    emitter.onComplete();
+                }
             }
         });
     }
@@ -285,7 +308,9 @@ public class DownloadHelper {
                         if (!response.isSuccessful()) {
                             throw new IllegalArgumentException(formatStr(URL_ILLEGAL, url));
                         } else {
-                            recordTable.saveFileInfo(url, response);
+                            synchronized (lock){
+                                recordTable.saveFileInfo(url, response);
+                            }
                         }
                     }
                 })
@@ -309,7 +334,9 @@ public class DownloadHelper {
                 .doOnNext(new Consumer<Response<Void>>() {
                     @Override
                     public void accept(Response<Void> response) throws Exception {
-                        recordTable.saveRangeInfo(url, response);
+                        synchronized (lock) {
+                            recordTable.saveRangeInfo(url, response);
+                        }
                     }
                 })
                 .map(new Function<Response<Void>, Object>() {
@@ -332,7 +359,9 @@ public class DownloadHelper {
                 .doOnNext(new Consumer<Response<Void>>() {
                     @Override
                     public void accept(Response<Void> response) throws Exception {
-                        recordTable.saveFileState(url, response);
+                        synchronized (lock) {
+                            recordTable.saveFileState(url, response);
+                        }
                     }
                 })
                 .map(new Function<Response<Void>, Object>() {

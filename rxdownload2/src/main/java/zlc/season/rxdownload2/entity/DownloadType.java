@@ -81,7 +81,6 @@ public abstract class DownloadType {
                         return download();
                     }
                 })
-                .observeOn(Schedulers.io())
                 .map(new Function<DownloadStatus, DownloadStatus>() {
                     @Override
                     public DownloadStatus apply(@NonNull DownloadStatus status) throws Exception {
@@ -295,7 +294,8 @@ public abstract class DownloadType {
                     .replay(1)
                     .autoConnect();
             return flowable.throttleFirst(100, TimeUnit.MILLISECONDS).mergeWith(flowable.takeLast(1))
-                    .subscribeOn(Schedulers.newThread());
+                    .subscribeOn(Schedulers.newThread())
+                    .observeOn(Schedulers.io());
         }
     }
 

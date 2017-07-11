@@ -2,8 +2,8 @@ package zlc.season.rxdownload2.function;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import retrofit2.Response;
 import zlc.season.rxdownload2.db.DataBaseHelper;
@@ -31,7 +31,7 @@ public class TemporaryRecordTable {
     private Map<String, TemporaryRecord> map;
 
     public TemporaryRecordTable() {
-        this.map = new HashMap<>();
+        this.map = new ConcurrentHashMap<>();
     }
 
     public void add(String url, TemporaryRecord record) {

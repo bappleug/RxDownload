@@ -22,8 +22,8 @@ public class MainActivity extends AppCompatActivity {
 		//
 		Utils.setDebug(true);
 		RxDownload.getInstance(this)
-				.maxDownloadNumber(2)
-				.maxThread(2);
+				.maxDownloadNumber(5)
+				.maxThread(3);
 	}
 
 	public class Presenter {

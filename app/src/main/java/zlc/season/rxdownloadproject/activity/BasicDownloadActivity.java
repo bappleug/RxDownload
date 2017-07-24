@@ -9,7 +9,6 @@ import android.os.Bundle;
 import android.support.v4.content.FileProvider;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
-
 import android.widget.Toast;
 
 import com.tbruyelle.rxpermissions2.RxPermissions;
@@ -32,47 +31,73 @@ import zlc.season.rxdownloadproject.model.DownloadController;
 import static zlc.season.rxdownload2.function.Utils.dispose;
 
 public class BasicDownloadActivity extends AppCompatActivity {
-    private String url = Constants.URL;
-    private Disposable disposable;
+    private String url1 = Constants.URL;
+    private String url2 = Constants.URL_TEST;
+    private String[] urls = new String[]{url1, url2};
+    private Disposable[] disposables = new Disposable[2];
     private RxDownload rxDownload;
-    private DownloadController downloadController;
+    private DownloadController[] downloadControllers = new DownloadController[2];
     private ActivityBasicDownloadBinding binding = null;
-    private BaseModel baseModel = null;
+    private BaseModel baseModel1 = null;
+    private BaseModel baseModel2 = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         // initData
-        baseModel = new BaseModel();
+        baseModel1 = new BaseModel();
+        baseModel2 = new BaseModel();
         // initView
         binding = DataBindingUtil.setContentView(this, R.layout.activity_basic_download);
-        binding.setItem(baseModel);
+        binding.setItem1(baseModel1);
+        binding.setItem2(baseModel2);
         binding.contentBasicDownload.setPresenter(new Presenter());
         setSupportActionBar(binding.toolbar);
         //
         rxDownload = RxDownload.getInstance(this);
-        downloadController = new DownloadController(binding.contentBasicDownload.status, binding.contentBasicDownload.action);
-        downloadController.setState(new DownloadController.Normal());
+        downloadControllers[0] = new DownloadController(binding.contentBasicDownload.status1, binding.contentBasicDownload.action1);
+        downloadControllers[0].setState(new DownloadController.Normal());
+        downloadControllers[1] = new DownloadController(binding.contentBasicDownload.status2, binding.contentBasicDownload.action2);
+        downloadControllers[1].setState(new DownloadController.Normal());
+        ;
     }
 
     public class Presenter {
         public void onClick(View view) {
             switch (view.getId()) {
-                case R.id.action:
-                    downloadController.handleClick(new DownloadController.Callback() {
+                case R.id.action1:
+                    downloadControllers[0].handleClick(new DownloadController.Callback() {
                         @Override
                         public void startDownload() {
-                            start();
+                            start(0);
                         }
 
                         @Override
                         public void pauseDownload() {
-                            pause();
+                            pause(0);
                         }
 
                         @Override
                         public void install() {
-                            installApk();
+                            installApk(0);
+                        }
+                    });
+                    break;
+                case R.id.action2:
+                    downloadControllers[1].handleClick(new DownloadController.Callback() {
+                        @Override
+                        public void startDownload() {
+                            start(1);
+                        }
+
+                        @Override
+                        public void pauseDownload() {
+                            pause(1);
+                        }
+
+                        @Override
+                        public void install() {
+                            installApk(1);
                         }
                     });
                     break;
@@ -86,10 +111,12 @@ public class BasicDownloadActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        dispose(disposable);
+        for (Disposable disposable : disposables) {
+            dispose(disposable);
+        }
     }
 
-    private void start() {
+    private void start(final int index) {
         RxPermissions.getInstance(this)
                 .request(Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 .doOnNext(new Consumer<Boolean>() {
@@ -101,43 +128,51 @@ public class BasicDownloadActivity extends AppCompatActivity {
                     }
                 })
                 .observeOn(Schedulers.io())
-                .compose(rxDownload.<Boolean>transform(url))
+                .compose(rxDownload.<Boolean>transform(urls[index], "", getExternalFilesDir("base/download").getAbsolutePath()))
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(new Observer<DownloadStatus>() {
                     @Override
                     public void onSubscribe(Disposable d) {
-                        disposable = d;
-                        downloadController.setState(new DownloadController.Started());
+                        disposables[index] = d;
+                        downloadControllers[index].setState(new DownloadController.Started());
                     }
 
                     @Override
                     public void onNext(DownloadStatus status) {
-                        binding.contentBasicDownload.progress.setIndeterminate(status.isChunked);
-                        binding.contentBasicDownload.progress.setMax((int) status.getTotalSize());
-                        binding.contentBasicDownload.progress.setProgress((int) status.getDownloadSize());
-                        baseModel.setPercent(status.getPercent());
-                        baseModel.setSize(status.getFormatStatusString());
+                        if(index == 0){
+                            binding.contentBasicDownload.progress1.setIndeterminate(status.isChunked);
+                            binding.contentBasicDownload.progress1.setMax((int) status.getTotalSize());
+                            binding.contentBasicDownload.progress1.setProgress((int) status.getDownloadSize());
+                            baseModel1.setPercent(status.getPercent());
+                            baseModel1.setSize(status.getFormatStatusString());
+                        } else {
+                            binding.contentBasicDownload.progress2.setIndeterminate(status.isChunked);
+                            binding.contentBasicDownload.progress2.setMax((int) status.getTotalSize());
+                            binding.contentBasicDownload.progress2.setProgress((int) status.getDownloadSize());
+                            baseModel2.setPercent(status.getPercent());
+                            baseModel2.setSize(status.getFormatStatusString());
+                        }
                     }
 
                     @Override
                     public void onError(Throwable e) {
-                        downloadController.setState(new DownloadController.Paused());
+                        downloadControllers[index].setState(new DownloadController.Paused());
                     }
 
                     @Override
                     public void onComplete() {
-                        downloadController.setState(new DownloadController.Completed());
+                        downloadControllers[index].setState(new DownloadController.Completed());
                     }
                 });
     }
 
-    private void pause() {
-        downloadController.setState(new DownloadController.Paused());
-        dispose(disposable);
+    private void pause(int index) {
+        downloadControllers[index].setState(new DownloadController.Paused());
+        dispose(disposables[index]);
     }
 
-    private void installApk() {
-        File[] files = rxDownload.getRealFiles(url);
+    private void installApk(int index) {
+        File[] files = rxDownload.getRealFiles(urls[index]);
         if (files != null) {
             Uri uri = null;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {

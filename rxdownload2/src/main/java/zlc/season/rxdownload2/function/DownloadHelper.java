@@ -33,7 +33,9 @@ import static zlc.season.rxdownload2.function.Constant.DOWNLOAD_URL_EXISTS;
 import static zlc.season.rxdownload2.function.Constant.REQUEST_RETRY_HINT;
 import static zlc.season.rxdownload2.function.Constant.TEST_RANGE_SUPPORT;
 import static zlc.season.rxdownload2.function.Constant.URL_ILLEGAL;
+import static zlc.season.rxdownload2.function.Utils.deleteFiles;
 import static zlc.season.rxdownload2.function.Utils.formatStr;
+import static zlc.season.rxdownload2.function.Utils.getPaths;
 import static zlc.season.rxdownload2.function.Utils.log;
 import static zlc.season.rxdownload2.function.Utils.retry;
 
@@ -100,6 +102,7 @@ public class DownloadHelper {
      * @return DownloadStatus
      */
     public Observable<DownloadStatus> downloadDispatcher(final DownloadBean bean) {
+        final boolean[] alreadyExist = {false};
         return Observable.just(1)
                 .doOnSubscribe(new Consumer<Disposable>() {
                     @Override
@@ -123,19 +126,19 @@ public class DownloadHelper {
                     @Override
                     public void accept(Throwable throwable) throws Exception {
                         logError(throwable);
-                        if (!(throwable instanceof IllegalArgumentException)
-                                || !throwable.getMessage().contains("already exists")) {
-                            synchronized (lock){
-                                recordTable.delete(bean.getUrl());
-                            }
+                        if (throwable instanceof IllegalArgumentException
+                                && throwable.getMessage().contains("already exists")) {
+                            alreadyExist[0] = true;
                         }
                     }
                 })
-                .doOnComplete(new Action() {
+                .doFinally(new Action() {
                     @Override
                     public void run() throws Exception {
                         synchronized (lock){
-                            recordTable.delete(bean.getUrl());
+                            if(!alreadyExist[0]){
+                                recordTable.delete(bean.getUrl());
+                            }
                         }
                     }
                 });
@@ -379,5 +382,19 @@ public class DownloadHelper {
 
     public Observable<DownloadRecord> readRecord(String url) {
         return dataBaseHelper.readRecord(url);
+    }
+
+    public void deleteDownload(String url, boolean deleteFile) {
+        if(recordTable.contain(url)){
+            return;
+        }
+        if (deleteFile) {
+            DownloadRecord record = dataBaseHelper.readSingleRecord(url);
+            if (record != null) {
+                String[] paths = getPaths(record.getSaveName(), record.getSavePath());
+                deleteFiles(new File(paths[0]), new File(paths[1]), new File(paths[2]));
+            }
+        }
+        dataBaseHelper.deleteRecord(url);
     }
 }

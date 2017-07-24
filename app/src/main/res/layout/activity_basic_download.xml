@@ -9,7 +9,10 @@
         <import type="zlc.season.rxdownloadproject.model.BaseModel"/>
 
         <variable
-            name="item"
+            name="item1"
+            type="BaseModel"/>
+        <variable
+            name="item2"
             type="BaseModel"/>
     </data>
 
@@ -37,7 +40,8 @@
         <include
             android:id="@+id/content_basic_download"
             layout="@layout/content_basic_download"
-            app:item="@{item}"/>
+            app:item1="@{item1}"
+            app:item2="@{item2}"/>
 
         <android.support.design.widget.FloatingActionButton
             android:id="@+id/fab"
